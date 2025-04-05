@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-secret
+  namespace: crud-app
+type: Opaque
+data:
+  POSTGRES_PASSWORD: QXAwMHJQYSQkdzByZCE=
+  POSTGRES_USER: cG9zdGdyZXM=
+  POSTGRES_DB: cG9zdGdyZXM=
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-pv
+  namespace: crud-app
+spec:
+  storageClassName: standard
+  capacity:
+    storage: "1Gi"
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /tmp/postgres
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: crud-app
+spec:
+  storageClassName: standard
+  resources:
+    requests:
+      storage: "100Mi"
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-deployment
+  namespace: crud-app
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+      type: database
+  template:
+    metadata:
+      labels:
+        app: postgres
+        type: database
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16
+        resources:
+          limits:
+            memory: "500Mi"
+            cpu: "400m"
+        ports:
+        - containerPort: 5432
+        envFrom:
+        - secretRef:
+            name: db-secret
+        volumeMounts:
+        - mountPath: /var/lib/postgresql/data
+          name: postgres-volume
+      volumes:
+      - name: postgres-volume
+        persistentVolumeClaim: 
+          claimName: postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-svc
+  namespace: crud-app
+spec:
+  ports:
+  - port: 5432
+    protocol: TCP
+    targetPort: 5432
+  selector:
+    app: postgres
+    type: database
+  type: ClusterIP
